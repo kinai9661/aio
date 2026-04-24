@@ -1,38 +1,39 @@
-# Aqua Image Studio - Vercel Deployment Guide
+# Aqua Image Studio
 
-## Quick Deploy
+專業 AI 圖片生成網站，部署在 Vercel。
 
-1. Download `aqua-image-studio-vercel.zip`
-2. Extract and upload to GitHub (or use Vercel CLI)
-3. Connect to Vercel
-4. Set environment variable: `AQUA_API_KEY` = `aqua_sk_24dd0b35d58c407685912dd7ed1fe5cd`
-5. Deploy!
+## 一鍵部署
 
-## Environment Variables
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/import/project)
 
-| Variable | Value |
-|----------|-------|
-| AQUA_API_KEY | `` |
+手動部署：
+1. 下載源碼上傳到 GitHub
+2. 在 Vercel Import Project
+3. 使用默認配置即可（無需設置環境變量）
 
-## Features
+## 功能
 
-- ⚡ 6 AI Models: Flux 2, GPT Image 2, Imagen 4, NanoBanana, ZImage, Midjourney 7
-- 📐 5 Aspect Ratios: 1:1, 9:16, 16:9, 3:4, 4:3
-- 🔢 Generate 1-4 images at once
-- 💾 Download & Regenerate
-- 🌙 Dark professional theme
+- 6 種 AI 模型：Flux 2, GPT Image 2, Imagen 4, NanoBanana, ZImage, Midjourney 7
+- 5 種尺寸比例：1:1, 3:2, 2:3, 16:9, 9:16
+- 生成 1/2/4 張圖片
+- 點擊下載 / 重新生成
 
-## Project Structure
+## API
 
+`POST /api/generate`
+
+```json
+{
+  "prompt": "A beautiful sunset",
+  "model": "flux-2",
+  "size": "1024x1024",
+  "n": 1
+}
 ```
-├── api/
-│   └── generate.ts      # Serverless API function
-├── src/
-│   ├── components/      # UI components
-│   ├── pages/
-│   │   └── ImageStudio.tsx  # Main app page
-│   └── App.tsx          # Router setup
-├── vercel.json         # Vercel config
-├── package.json
-└── tailwind.config.js
+
+## 本地運行
+
+```bash
+npm install
+npm run dev
 ```
