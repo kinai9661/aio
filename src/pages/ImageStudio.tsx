@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -7,36 +7,52 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Sparkles, Download, Loader2, RefreshCw, Zap, Image as ImageIcon } from "lucide-react";
+import { Sparkles, Download, Loader2, RefreshCw, Zap, Image as ImageIcon, Upload, X } from "lucide-react";
 
 const MODELS = [
-  { id: "flux-2", name: "Flux 2", description: "High quality image generation" },
-  { id: "gptimage-2", name: "GPT Image 2", description: "Latest OpenAI image model" },
-  { id: "imagen4", name: "Imagen 4", description: "Google's image generation" },
-  { id: "nanobanana", name: "NanoBanana", description: "Fast and efficient" },
-  { id: "zimage", name: "ZImage", description: "Enhanced detail" },
-  { id: "midjourney", name: "Midjourney 7", description: "Artistic generation" },
+  { id: "gptimage-2", name: "GPT Image 2", description: "OpenAI 最新圖片生成模型" },
+  { id: "zimage", name: "ZImage", description: "增強細節，高質量生成" },
+  { id: "imagen4", name: "Imagen 4", description: "Google 圖片生成模型" },
+  { id: "grok-image", name: "Grok Image", description: "xAI 圖片生成模型" },
 ];
 
 const SIZES = [
-  { id: "1024x1024", name: "1:1", desc: "Square" },
-  { id: "1024x1792", name: "9:16", desc: "Portrait" },
-  { id: "1792x1024", name: "16:9", desc: "Landscape" },
-  { id: "1024x1360", name: "3:4", desc: "Portrait 3:4" },
-  { id: "1360x1024", name: "4:3", desc: "Landscape 4:3" },
+  { id: "landscape", name: "16:9", desc: "橫向" },
+  { id: "portrait", name: "9:16", desc: "縱向" },
+  { id: "square", name: "1:1", desc: "方形" },
 ];
-
-const COUNTS = [1, 2, 4];
 
 export default function ImageStudio() {
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState("flux-2");
-  const [size, setSize] = useState("1024x1024");
-  const [count, setCount] = useState(1);
+  const [model, setModel] = useState("gptimage-2");
+  const [size, setSize] = useState("square");
   const [generating, setGenerating] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [seed] = useState(Math.floor(Math.random() * 999999999));
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [referenceFile, setReferenceFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setReferenceFile(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setReferenceImage(ev.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeReferenceImage = () => {
+    setReferenceImage(null);
+    setReferenceFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const generate = async () => {
     if (!prompt.trim()) return;
@@ -49,22 +65,44 @@ export default function ImageStudio() {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, model, size, n: count, seed }),
+        body: JSON.stringify({ 
+          prompt, 
+          model, 
+          ratio: size,
+          image: referenceImage || null,  // Send as base64 data URL
+        }),
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Generation failed");
+        const text = await response.text();
+        let errorMsg = "生成失敗";
+        try {
+          const data = JSON.parse(text);
+          errorMsg = data.error || data.message || text;
+        } catch {
+          errorMsg = text || errorMsg;
+        }
+        throw new Error(errorMsg);
       }
 
-      const data = await response.json();
-      const urls = data.data?.map((img: { url?: string; b64_json?: string }) => 
-        img.url || (img.b64_json ? `data:image/png;base64,${img.b64_json}` : "")
-      ).filter(Boolean) || [];
-      
-      setImages(urls);
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error("無效的服務器響應");
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || "生成失敗");
+      }
+
+      const url = data.url;
+      if (url) {
+        setImages([url]);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(err instanceof Error ? err.message : "發生錯誤");
     } finally {
       setGenerating(false);
     }
@@ -91,13 +129,13 @@ export default function ImageStudio() {
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Aqua Image Studio</h1>
-              <p className="text-xs text-slate-400">AI-Powered Image Generation</p>
+              <h1 className="text-xl font-bold text-white">Aqua 圖片工作室</h1>
+              <p className="text-xs text-slate-400">AI 智能圖片生成</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm text-slate-400">Powered by Aqua API</span>
+            <span className="text-sm text-slate-400">Aqua API 驅動</span>
           </div>
         </div>
       </header>
@@ -110,10 +148,10 @@ export default function ImageStudio() {
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <ImageIcon className="w-5 h-5 text-cyan-400" />
-                  Create Image
+                  創建圖片
                 </CardTitle>
                 <CardDescription className="text-slate-400">
-                  Enter a detailed description for your AI-generated image
+                  輸入描述文字或上傳參考圖片，AI 將為你生成獨特的作品
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -122,27 +160,65 @@ export default function ImageStudio() {
                   <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="A majestic mountain landscape at sunset with golden light, highly detailed, 8K resolution..."
+                    placeholder="例如：一隻可愛的貓咪在花園裡玩耍，高質量，8K分辨率..."
                     className="w-full h-40 bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-white placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
+                  />
+                </div>
+
+                {/* Reference Image Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-3">參考圖片（可選）</label>
+                  {referenceImage ? (
+                    <div className="relative inline-block">
+                      <img
+                        src={referenceImage}
+                        alt="Reference"
+                        className="max-h-32 rounded-xl border border-slate-700"
+                      />
+                      <button
+                        onClick={removeReferenceImage}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <div className="mt-2 text-sm text-slate-400">
+                        已選擇參考圖片（圖生圖模式）
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-700 rounded-xl p-8 text-center cursor-pointer hover:border-cyan-500/50 transition-colors"
+                    >
+                      <Upload className="w-8 h-8 mx-auto mb-3 text-slate-500" />
+                      <p className="text-slate-400 text-sm">點擊上傳圖片</p>
+                      <p className="text-slate-500 text-xs mt-1">支援 JPG, PNG, WebP</p>
+                    </div>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
                   />
                 </div>
 
                 {/* Model Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-3">AI Model</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-3">AI 模型</label>
                   <div className="grid grid-cols-2 gap-3">
                     {MODELS.map((m) => (
                       <button
                         key={m.id}
                         onClick={() => setModel(m.id)}
-                        className={`p-3 rounded-xl border text-left transition-all ${
+                        className={`p-3 rounded-xl border text-center transition-all ${
                           model === m.id
                             ? "border-cyan-500 bg-cyan-500/10 text-white"
                             : "border-slate-700 bg-slate-800/30 text-slate-400 hover:border-slate-600"
                         }`}
                       >
                         <div className="text-sm font-medium">{m.name}</div>
-                        <div className="text-xs text-slate-500 mt-1">{m.description}</div>
                       </button>
                     ))}
                   </div>
@@ -150,13 +226,13 @@ export default function ImageStudio() {
 
                 {/* Size Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-3">Image Size</label>
-                  <div className="flex flex-wrap gap-2">
+                  <label className="block text-sm font-medium text-slate-300 mb-3">圖片比例</label>
+                  <div className="flex gap-2">
                     {SIZES.map((s) => (
                       <button
                         key={s.id}
                         onClick={() => setSize(s.id)}
-                        className={`px-4 py-2 rounded-lg border transition-all ${
+                        className={`flex-1 py-3 rounded-xl border font-medium transition-all ${
                           size === s.id
                             ? "border-cyan-500 bg-cyan-500/10 text-white"
                             : "border-slate-700 bg-slate-800/30 text-slate-400 hover:border-slate-600"
@@ -164,26 +240,6 @@ export default function ImageStudio() {
                       >
                         <span className="font-medium">{s.name}</span>
                         <span className="text-xs text-slate-500 ml-1">{s.desc}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Count Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-3">Number of Images</label>
-                  <div className="flex gap-2">
-                    {COUNTS.map((n) => (
-                      <button
-                        key={n}
-                        onClick={() => setCount(n)}
-                        className={`flex-1 py-3 rounded-xl border font-medium transition-all ${
-                          count === n
-                            ? "border-cyan-500 bg-cyan-500/10 text-white"
-                            : "border-slate-700 bg-slate-800/30 text-slate-400 hover:border-slate-600"
-                        }`}
-                      >
-                        {n} {n === 1 ? "image" : "images"}
                       </button>
                     ))}
                   </div>
@@ -198,12 +254,12 @@ export default function ImageStudio() {
                   {generating ? (
                     <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Generating...
+                      生成中...
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-5 h-5 mr-2" />
-                      Generate Images
+                      {referenceImage ? "圖生圖生成" : "文字生圖"}
                     </>
                   )}
                 </Button>
@@ -215,10 +271,10 @@ export default function ImageStudio() {
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 text-sm text-slate-400">
                   <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  API Status: Connected
+                  API 狀態：已連接
                 </div>
                 <div className="text-slate-500 text-sm mt-1">
-                  Endpoint: api.aquadevs.com
+                  端點：api.aquadevs.com
                 </div>
               </CardContent>
             </Card>
@@ -240,8 +296,8 @@ export default function ImageStudio() {
               <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-sm">
                 <CardContent className="p-12 flex flex-col items-center justify-center">
                   <Loader2 className="w-12 h-12 text-cyan-400 animate-spin mb-4" />
-                  <p className="text-slate-400">Creating your masterpiece...</p>
-                  <p className="text-slate-500 text-sm mt-2">This may take a few seconds</p>
+                  <p className="text-slate-400">正在創建你的作品...</p>
+                  <p className="text-slate-500 text-sm mt-2">這可能需要幾秒鐘</p>
                 </CardContent>
               </Card>
             )}
@@ -250,10 +306,10 @@ export default function ImageStudio() {
             {!generating && images.length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-white">Generated Images</h3>
+                  <h3 className="text-lg font-semibold text-white">生成的圖片</h3>
                   <Button onClick={regenerate} variant="outline" size="sm" className="border-slate-700 text-slate-300 hover:bg-slate-800">
                     <RefreshCw className="w-4 h-4 mr-2" />
-                    Regenerate
+                    重新生成
                   </Button>
                 </div>
                 <div className="grid gap-4">
@@ -272,7 +328,7 @@ export default function ImageStudio() {
                             className="bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700"
                           >
                             <Download className="w-4 h-4 mr-1" />
-                            Download
+                            下載
                           </Button>
                         </div>
                       </div>
@@ -289,9 +345,9 @@ export default function ImageStudio() {
                   <div className="w-20 h-20 rounded-2xl bg-slate-800/50 flex items-center justify-center mb-4">
                     <ImageIcon className="w-10 h-10 text-slate-600" />
                   </div>
-                  <h3 className="text-lg font-medium text-slate-300 mb-2">No Images Yet</h3>
+                  <h3 className="text-lg font-medium text-slate-300 mb-2">還沒有圖片</h3>
                   <p className="text-slate-500 text-sm max-w-xs">
-                    Enter a prompt and click Generate to create AI-powered images with state-of-the-art models
+                    輸入描述文字或上傳參考圖片，然後點擊生成按鈕來創建 AI 圖片
                   </p>
                 </CardContent>
               </Card>
@@ -303,7 +359,7 @@ export default function ImageStudio() {
       {/* Footer */}
       <footer className="border-t border-slate-800/50 mt-12">
         <div className="mx-auto max-w-7xl px-6 py-8 text-center text-sm text-slate-500">
-          <p>Powered by Aqua API • Generate images with state-of-the-art AI models</p>
+          <p>由 Aqua API 驅動 • 使用尖端 AI 模型生成圖片</p>
         </div>
       </footer>
     </div>
