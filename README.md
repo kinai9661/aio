@@ -12,7 +12,7 @@
 
 | Variable | Value |
 |----------|-------|
-| AQUA_API_KEY | `aqua_sk_24dd0b35d58c407685912dd7ed1fe5cd` |
+| AQUA_API_KEY | `` |
 
 ## Features
 
